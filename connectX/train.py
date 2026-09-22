@@ -1,11 +1,13 @@
 import torch
 import numpy as np
-from utilities import Memory, process_state
+from utilities import Memory, process_state, next_op_agent
 from kaggle_environments import make
 from reward import compute_reward_soft
 from validation import validate
+from loss import compute_loss
 
-def train(Q_func, optimizer, scheduler, my_config, env_config, train_config, op_agent='random', device='cpu'):
+
+def train(Q_func, optimizer, scheduler, my_config, env_config, train_config, device='cpu'):
     env = make('connectx')
 
     logs = {'loss': [], 'val_reward': [], 'lr': []}
@@ -17,12 +19,13 @@ def train(Q_func, optimizer, scheduler, my_config, env_config, train_config, op_
     Q_func.train()
     Q_func_hat.eval()
 
-    trainer = env.train([None, op_agent])
-    done = False
+    op_agents = next_op_agent(train_config)
+    trainer = env.train([None, next(op_agents)])
     obs = trainer.reset()
+    done = False
     state = process_state(obs, device)
 
-    for step in range(train_config.total_steps):
+    for step in range(1, train_config.total_steps + 1):
         if torch.rand(1) <= train_config.epsilon:
             action = int(np.random.choice(
                 [c for c in range(env_config.columns) if state[c] == 0]
@@ -42,13 +45,9 @@ def train(Q_func, optimizer, scheduler, my_config, env_config, train_config, op_
             print(f'| step: {step} |')
 
         if len(memory) >= train_config.batch_size * 2: # ???
-            states, actions, rewards, next_states, dones = memory.sample_minibatch()
-            
-            with torch.no_grad():
-                target_rewards = rewards + Q_func_hat(next_states).max(dim=-1).values * ~dones
-            pred_rewards = Q_func(states)[torch.arange(train_config.batch_size, device=device),actions]
+            minibatch = memory.sample_minibatch()
+            loss = compute_loss(minibatch, Q_func, Q_func_hat, train_config, device=device)
 
-            loss = (1 / train_config.batch_size) * torch.square(target_rewards - pred_rewards).sum()
             logs['loss'].append(loss.item())
             logs['lr'].append(optimizer.param_groups[0]['lr'])
 
@@ -58,23 +57,29 @@ def train(Q_func, optimizer, scheduler, my_config, env_config, train_config, op_
             scheduler.step()
 
             if step % 100 == 0:
-                print(f'| step: {step} | loss: {loss.item()} |')
+                print(f'| step: {step} | loss: {loss.item():.4f} |')
+
+            # move target
+            if step % train_config.move_target_every == 0:
+                Q_func_hat.load_state_dict(Q_func.state_dict())
 
         if done:
+            trainer = env.train([None, next(op_agents)])
             obs = trainer.reset()
             state = process_state(obs, device)
         else:
             state = next_state
-
+        
+        ## validation
         if step % train_config.validate_every == 0:
             val_reward = validate(
                 Q_func, 
                 num_episodes=train_config.num_episodes,
-                op_agent=op_agent, 
+                op_agent=train_config.val_op_agent, 
                 device=device
             )
             logs['val_reward'].append(val_reward)
 
-            print(f'| step: {step} | val_reward: {val_reward} |')
+            print(f'| step: {step} | val_reward: {val_reward:.4f} |')
     
     return logs

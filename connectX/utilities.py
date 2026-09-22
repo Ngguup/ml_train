@@ -53,3 +53,57 @@ class Memory:
             self.next_state[idx],
             self.done[idx]
         )
+    
+
+def next_op_agent(train_config):
+    op_agents = train_config.op_agents
+    i = 0
+    while True:
+        yield op_agents[i]
+        i = (i + 1) % len(op_agents)
+
+
+# make submission file
+import inspect
+from my_dqn import My_DQN
+from types import SimpleNamespace
+
+
+def my_agent(obs, env_config):
+    assert env_config.rows == 6
+    assert env_config.columns == 7
+    assert env_config.inarow == 4
+
+    my_config = SimpleNamespace(
+        h=128
+    )
+
+    Q_func = My_DQN(env_config, my_config)
+    Q_func.load_state_dict(state_dict)
+
+    moves = Q_func(process_state(obs)[None,:])[0]
+    mask_board = torch.tensor(obs.board[:env_config.columns], dtype=bool)
+
+    action = torch.masked_fill(moves, mask_board, -float('inf')).argmax().item()
+    print('action:', action)
+    return action
+
+def make_submission(Q_func):
+    state_dict = Q_func.state_dict()
+
+    with open('submission.py', 'w') as f:
+        f.write('import torch\n')
+        f.write('from types import SimpleNamespace\n')
+        f.write('from collections import OrderedDict\n')
+        f.write('\n\n')
+
+        f.write('global state_dict = OrderedDict({\n')
+        for name, tensor in state_dict.items():
+            f.write(f'\t{name!r}: torch.tensor(')
+            f.write(repr(tensor.cpu().tolist()))
+            f.write(f', dtype=torch.{str(tensor.dtype).split('.')[-1]}),\n')
+        f.write('})\n\n')
+
+        f.write(f'{inspect.getsource(My_DQN)}\n\n')
+        f.write(f'{inspect.getsource(process_state)}\n\n')
+        f.write(f'{inspect.getsource(my_agent)}\n\n')
