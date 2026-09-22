@@ -97,7 +97,7 @@ def make_submission(Q_func):
         f.write('from collections import OrderedDict\n')
         f.write('\n\n')
 
-        f.write('global state_dict = OrderedDict({\n')
+        f.write('state_dict = OrderedDict({\n')
         for name, tensor in state_dict.items():
             f.write(f'\t{name!r}: torch.tensor(')
             f.write(repr(tensor.cpu().tolist()))
@@ -106,4 +106,4 @@ def make_submission(Q_func):
 
         f.write(f'{inspect.getsource(My_DQN)}\n\n')
         f.write(f'{inspect.getsource(process_state)}\n\n')
-        f.write(f'{inspect.getsource(my_agent)}\n\n')
+        f.write(f'{inspect.getsource(my_agent)}')
