@@ -10,7 +10,7 @@ from loss import compute_loss
 def train(Q_func, optimizer, scheduler, my_config, env_config, train_config, device='cpu'):
     env = make('connectx')
 
-    logs = {'loss': [], 'val_reward': [], 'lr': []}
+    logs = {'loss': [], 'val_reward': [], 'val_step': [], 'lr': []}
     memory = Memory(env_config, train_config, device)
 
     Q_func_hat = type(Q_func)(env_config, my_config, device)
@@ -41,10 +41,10 @@ def train(Q_func, optimizer, scheduler, my_config, env_config, train_config, dev
 
         memory.write(state, action, reward, next_state, done)
 
-        if len(memory) < train_config.batch_size * 2 and step % 100 == 0:
+        if len(memory) < train_config.batch_size * train_config.train_after_batch_n and step % 100 == 0:
             print(f'| step: {step} |')
 
-        if len(memory) >= train_config.batch_size * 2: # ???
+        if len(memory) >= train_config.batch_size * train_config.train_after_batch_n: # ???
             minibatch = memory.sample_minibatch()
             loss = compute_loss(minibatch, Q_func, Q_func_hat, train_config, device=device)
 
@@ -79,6 +79,7 @@ def train(Q_func, optimizer, scheduler, my_config, env_config, train_config, dev
                 device=device
             )
             logs['val_reward'].append(val_reward)
+            logs['val_step'].append(step)
 
             print(f'| step: {step} | val_reward: {val_reward:.4f} |')
     

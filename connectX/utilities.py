@@ -63,6 +63,24 @@ def next_op_agent(train_config):
         i = (i + 1) % len(op_agents)
 
 
+def save_checkpoint(model, optimizer, scheduler, file_num):
+    checkpoint = {
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'scheduler': scheduler.state_dict()
+    }
+
+    torch.save(checkpoint, f'checkpoints/save_{file_num}.pth')
+
+
+def load_checkpoint(model, optimizer, scheduler, file_num):
+    checkpoint = torch.load(f'checkpoints/save_{file_num}.pth', weights_only=True)
+
+    model.load_state_dict(checkpoint['model'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    scheduler.load_state_dict(checkpoint['scheduler'])
+
+
 # make submission file
 import inspect
 from my_dqn import My_DQN

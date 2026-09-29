@@ -6,7 +6,8 @@ def validate(Q_func, num_episodes=100, op_agent='random', device='cpu'):
     Q_func.eval()
 
     def mean_reward(rewards):
-        return sum(r[0] for r in rewards) / float(len(rewards))
+        rewards = [r[0] for r in rewards if r[0] is not None]
+        return sum(rewards) / float(len(rewards))
 
 
     def my_agent(obs, env_config):
